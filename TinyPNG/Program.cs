@@ -1,10 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using TinyPng;
+//using TinyPng;
 
 namespace TinyPNG
 {
@@ -51,18 +54,48 @@ namespace TinyPNG
 
                 foreach (var item in files)
                 {
+                    //try
+                    //{
+                    //    DisplayTinyPNG(apiKey, item).Wait();
+                    //}
+                    //catch (Exception)
+                    //{
+                    //    Console.WriteLine("API Key 暂时无法使用，按任意键退出！");
+                    //    Console.ReadKey();
+                    //    return;
+                    //}
+
+
+                    //参考：https://blog.csdn.net/lhtzbj12/article/details/54143044
                     try
                     {
-                        DisplayTinyPNG(apiKey, item).Wait();
+                        Image srcImage = Image.FromFile(item);
+                        ImageFormat format = srcImage.RawFormat;
+                        Bitmap destImage = new Bitmap(srcImage.Width, srcImage.Height);
+                        var graphics = GetGraphics(destImage);
+                        graphics.DrawImage(srcImage, new Rectangle(0, 0, srcImage.Width, srcImage.Height), new Rectangle(0, 0, srcImage.Width, srcImage.Height), GraphicsUnit.Pixel);
+                        srcImage.Dispose();
+                        if (format.Guid == ImageFormat.Jpeg.Guid)
+                        {
+                            destImage.Save(item, ImageFormat.Jpeg);
+                            destImage.Dispose();
+                            FileInfo f = new FileInfo(item);
+                            f.LastWriteTime = lastWriteTime;
+                        }
+                        else if (format.Guid == ImageFormat.Png.Guid)
+                        {
+                            destImage.Save(item, ImageFormat.Png);
+                            destImage.Dispose();
+                            FileInfo f = new FileInfo(item);
+                            f.LastWriteTime = lastWriteTime;
+                        }
                     }
-                    catch (Exception)
+                    catch (Exception e)
                     {
-                        Console.WriteLine("API Key 暂时无法使用，按任意键退出！");
+                        Console.WriteLine(e.Message);
                         Console.ReadKey();
                         return;
                     }
-                    FileInfo f = new FileInfo(item);
-                    f.LastWriteTime = lastWriteTime;
                 }
             }
             else
@@ -73,14 +106,32 @@ namespace TinyPNG
             }
         }
 
-        static async Task DisplayTinyPNG(string apiKey, string path)
+        /// <summary>
+        /// 获取高清的Graphics
+        /// </summary>
+        /// <param name="img"></param>
+        /// <returns></returns>
+        static Graphics GetGraphics(Image img)
         {
-            using (var png = new TinyPngClient(apiKey))
-            {
-                var result = await png.Compress(path);
-                var compressedImage = await png.Download(result);
-                await compressedImage.SaveImageToDisk(path);
-            }
+            var g = Graphics.FromImage(img);
+            //设置质量
+            g.SmoothingMode = SmoothingMode.HighQuality;
+            g.CompositingQuality = CompositingQuality.HighQuality;
+            //InterpolationMode不能使用High或者HighQualityBicubic,如果是灰色或者部分浅色的图像是会在边缘处出一白色透明的线
+            //用HighQualityBilinear却会使图片比其他两种模式模糊（需要肉眼仔细对比才可以看出）
+            g.InterpolationMode = InterpolationMode.Default;
+            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
+            return g;
         }
+
+        //static async Task DisplayTinyPNG(string apiKey, string path)
+        //{
+        //    using (var png = new TinyPngClient(apiKey))
+        //    {
+        //        var result = await png.Compress(path);
+        //        var compressedImage = await png.Download(result);
+        //        await compressedImage.SaveImageToDisk(path);
+        //    }
+        //}
     }
 }
